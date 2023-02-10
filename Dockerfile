@@ -5,7 +5,7 @@ WORKDIR /app
 COPY ./src/mysimplewebapp/ .
 RUN msbuild ./mysimplewebapp.sln -t:Restore /p:Configuration=Release
 
-FROM mcr.microsoft.com/iis:windowsservercore-ltsc2022 AS runtime
+FROM mcr.microsoft.com/dotnet/framework/aspnet:4.8-windowsservercore-ltsc2022 AS runtime
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 #Install the necessary IIS components
