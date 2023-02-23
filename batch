@@ -1,0 +1,115 @@
+@echo off
+
+@rem       NOTE: This app_version will be applied to MSIs and should match
+@rem       the application version defined in the IntegratedMenu.build file
+@rem       set app_version=5.0
+@set app_version=0.0.0
+
+goto start
+
+:usage
+echo Usage: create--batch-deployment [cruise build number] [database build number] [environment]
+echo        where [environment] is "dev.deploy", "awsqual.deploy", "awsquala.deploy", "awsqualb.deploy" or "awsprod.deploy"
+goto end
+	
+:start
+if "%1" == "" goto usage
+if "%2" == "" goto usage
+if "%3" == "" goto usage
+
+@echo resetting iis...
+iisreset /stop
+
+@set gitpath=https://dev.azure.com/tc-energy/NGTL/_git/IntegratedMenu
+
+IF NOT EXIST staging GOTO gitCheckout
+
+cd staging
+
+echo.
+echo Switching Integrated Menu to Git path %gitpath%
+echo.
+git checkout master
+git fetch --all --tags --prune
+git checkout tags/build-%1
+if errorlevel 1 goto error
+
+goto gitSwitchDb
+
+:gitCheckout
+
+@rem Create the staging directory if it does not exist
+mkdir staging
+cd staging
+
+echo.
+echo Switching Integrated Menu to GIT path %gitpath%
+echo.
+git clone %gitpath% .
+git fetch --all --tags --prune
+git checkout tags/build-%1
+if errorlevel 1 goto error
+
+:gitSwitchDb
+cd..
+IF NOT EXIST AgaDb GOTO gitAgaDbCheckout
+
+cd Agadb
+git checkout master
+git fetch --all --tags --prune
+git checkout tags/build-%2
+cd..
+cd staging
+if errorlevel 1 goto error
+
+goto build
+
+
+:gitAgaDbCheckout
+@set gitpath_agadb=https://dev.azure.com/tc-energy/NGTL/_git/AgaDb
+
+echo.
+echo Switching AgaDb to Git path %gitpath_agadb%
+echo.
+git clone %gitpath_agadb%
+cd AgaDb
+git fetch --all --tags --prune
+git checkout tags/build-%2
+cd..
+cd staging
+if errorlevel 1 goto error
+
+:build
+echo.
+echo Building distribution
+echo.
+call build.bat -D:TCBuildLabel=%1 clean apply.version
+
+if errorlevel 1 goto error
+
+call build.bat -D:TCBuildLabel=%1 %3
+if errorlevel 1 goto error
+
+xcopy /y dist\*.zip ..\dist\*.zip
+echo.
+echo Build successful!
+
+rmdir ..\AgaDb /s /q
+goto cleanup
+
+:error
+echo. 
+echo Build failed.
+goto cleanup
+
+:cleanup
+echo.
+echo In Clean up nothing to do right now.
+echo.
+cd ..
+iisreset /start
+
+echo.
+
+
+:end
