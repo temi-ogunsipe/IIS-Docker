@@ -1,0 +1,50 @@
+FROM mcr.microsoft.com/dotnet/framework/sdk:4.8-windowsservercore-ltsc2022 AS build
+WORKDIR /app
+
+# Copy everything and build app
+COPY . .
+RUN msbuild ./WebService/VolumeService.sln  -p:RestorePackagesConfig=true /p:Configuration=Release
+
+FROM mcr.microsoft.com/dotnet/framework/aspnet:4.8-windowsservercore-ltsc2022 AS runtime
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';" ]
+
+# Configure App specific IIS properties
+RUN Import-Module WebAdministration; \
+    $app = 'ECSAPP'; \
+    New-Item -Path 'c:\' -Name 'websites' -ItemType 'directory'; \
+    New-Item -Path 'c:\websites' -Name $app -ItemType 'directory'; \
+    New-Item -Path c:\websites\$app -Name #{ENVIRONMENT}# -ItemType 'directory'; \
+    Install-WindowsFeature -Name Web-Windows-Auth –IncludeAllSubFeature; \
+    New-WebAppPool -Name $app; \
+    New-Website -Name $app -PhysicalPath c:\websites\$app -Port 8081 -ApplicationPool $app -Force; \
+    Set-ItemProperty -Path IIS:\AppPools\$app -Name "ProcessModel.IdentityType" -Value "ApplicationPoolIdentity"; \
+    Set-WebConfigurationProperty -Filter '/system.webServer/security/authentication/anonymousAuthentication' -Name Enabled -Value True -PSPath 'IIS:\' -Location $app; \
+    Set-WebConfigurationProperty -Filter '/system.webServer/security/authentication/windowsAuthentication' -Name Enabled -Value True -PSPath 'IIS:\' -Location $app; \
+    New-Item IIS:\Sites\$app\#{ENVIRONMENT}# -physicalPath C:\websites\$app\#{ENVIRONMENT}# -type Application; \
+    New-Item IIS:\Sites\$app\#{ENVIRONMENT}#\WebService -physicalPath C:\websites\$app\#{ENVIRONMENT}#\WebService -type Application; \
+    New-Item IIS:\Sites\$app\#{ENVIRONMENT}#\WebService\VolumeService -physicalPath C:\websites\$app\#{ENVIRONMENT}#\WebService\VolumeService -type Application
+    
+    
+# Install LogMonitor and create configuration file
+RUN mkdir C:\LogMonitor ; \
+    mkdir C:\LogMonitor\Logs ; \
+    mkdir C:\LogMonitor\Scripts ; \
+    New-Item C:\LogMonitor\LogMonitorConfig.json -ItemType File ; \
+    Add-Content -Path C:\LogMonitor\LogMonitorConfig.json -Value '{ "logs": [ { "path": "C:\\inetpub\\logs\\LogFiles\\W3SVC1\\u_ex*.log", "type": "iis", "tags": { "app": "ECSAPP", "env": "#{ENVIRONMENT}#" } } ], "scripts": [] }'
+
+WORKDIR /websites/ECSAPP/#{ENVIRONMENT}#
+COPY --from=build /app ./
+
+RUN dir
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';" ]
+RUN "tzutil /s 'Central Standard Time'"
+
+EXPOSE 8081
+
+
+
+
+
+
