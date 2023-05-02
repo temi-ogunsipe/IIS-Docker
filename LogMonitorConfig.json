@@ -1,0 +1,44 @@
+{
+  "LogConfig": {
+    "sources": [
+      {
+        "type": "EventLog",
+        "startAtOldestRecord": true,
+        "eventFormatMultiLine": false,
+        "channels": [
+          {
+            "name": "system",
+            "level": "Information"
+          },
+          {
+            "name": "application",
+            "level": "Error"
+          }
+        ]
+      },
+      {
+        "type": "File",
+        "directory": "C:\\inetpub\\logs\\LogFiles",
+        "filter": "*.log",
+        "includeSubdirectories": true,
+        "includeFileNames": false
+      }
+    ],
+    "metrics": [
+      {
+        "type": "PerformanceCounter",
+        "instanceName": "",
+        "categoryName": "Processor",
+        "counterName": "% Processor Time",
+        "samplingInterval": "PT5S"
+      },
+      {
+        "type": "PerformanceCounter",
+        "instanceName": "",
+        "categoryName": "Memory",
+        "counterName": "Available Bytes",
+        "samplingInterval": "PT5S"
+      }
+    ]
+  }
+}
